@@ -1,0 +1,103 @@
+[{setup, [{data_dir, "/var/lib/ergw"},
+          {log_dir,  "/var/log/pgw-c-node"}                             %% NOTE: lager is not using this
+         ]},
+
+ {ergw, [{sockets,
+      [{irx, [{type, 'gtp-c'},
+          {ip, ${PGW_S5C_IPADDR_ERL}},
+          {netdev, "$PGW_S5C_IFACE"},
+          freebind
+         ]},
+       {grx, [{type, 'gtp-u'},
+          {node, 'ergw-gtp-u-node@${HOSTNAME}'},
+          {name, 'grx'}]}
+      ]},
+
+     {vrfs,
+      [{$PGW_SGI_IFACE, [{pools,  [{${PGW_CLIENT_IPADDR_START_ERL}, ${PGW_CLIENT_IPADDR_END_ERL}, 32}
+                            ]},
+                   {'MS-Primary-DNS-Server', ${PGW_CLIENT_PRIMARY_DNS_ERL}},
+                   {'MS-Secondary-DNS-Server', ${PGW_CLIENT_PRIMARY_DNS_ERL}},
+                   {'MS-Primary-NBNS-Server', ${PGW_CLIENT_PRIMARY_NBNS_ERL}},
+                   {'MS-Secondary-NBNS-Server', ${PGW_CLIENT_PRIMARY_NBNS_ERL}}
+              ]}
+      ]},
+
+     {handlers,
+      [{'h1', [{handler, pgw_s5s8},
+               {protocol, gn},
+               {sockets, [irx]},
+               {data_paths, [grx]},
+               {aaa, [{'Username',
+                     [{default, ['IMSI', <<"@">>, 'APN']}]}]}
+              ]},
+       {'h2', [{handler, pgw_s5s8},
+               {protocol, s5s8},
+               {sockets, [irx]},
+               {data_paths, [grx]}
+              ]}
+      ]},
+
+     {apns,
+      [{${PGW_APN_ERL}, [{vrf, $PGW_SGI_IFACE}]},
+       {'_' , [{vrf, $PGW_SGI_IFACE}]}
+      ]}
+    ]},
+
+ {ergw_aaa, [
+          {ergw_aaa_provider, {ergw_aaa_mock, [{shared_secret, <<"MySecret">>}]}}
+          %% {ergw_aaa_provider,
+          %%  {ergw_aaa_radius,
+          %%   [{nas_identifier,<<"nas_id">>},
+          %%    {radius_auth_server,{{127,0,0,1},1812,<<"secret">>}},
+          %%    {radius_acct_server,{{127,0,0,1},1813,<<"secret">>}}
+          %%   ]}
+          %% }
+        ]},
+
+ {lager, [
+     {colored, true},
+     {log_root, "/var/log/pgw-c-node"},
+     {error_logger_redirect, true},
+     {crash_log, "crash.log"},
+     {handlers, [
+             {lager_console_backend, debug},
+             {lager_file_backend, [{file, "error.log"}, {level, error}]},
+             {lager_file_backend, [{file, "console.log"}, {level, debug}]}
+            ]}
+    ]}
+].
+bash-4.4# exit
+exit
+PS C:\Users\kdargel> kubectl exec -it ergw-pgw-56f6d65fdc-cfvk6 -c ergw-u-node /bin/bash
+root@ergw-pgw-56f6d65fdc-cfvk6:/# cd config/
+root@ergw-pgw-56f6d65fdc-cfvk6:/config# ls
+pgw-u-node.config.templ
+root@ergw-pgw-56f6d65fdc-cfvk6:/config# cat pgw-u-node.config.templ
+[
+ {'ergw-gtp-u-node', []},
+
+ {gtp_u_kmod, [
+               {sockets, [{grx, [{ip, ${PGW_S5U_IPADDR_ERL}},
+                                 {netdev, "${PGW_S5U_IFACE}"},
+                                 freebind,
+                                 %% {netns, "/var/run/netns/grx"},
+                                 {vrf, [
+                                        {routes, [${PGW_CLIENT_IP_NET_ERL}]}
+                                       ]}
+                                ]}
+                         ]}
+              ]},
+
+ {lager, [
+          {log_root, "/var/log/pgw-u-node"},
+          {error_logger_redirect, true},
+          {colored, true},
+          {crash_log, "crash.log"},
+          {handlers, [
+                      {lager_console_backend, info},
+                      {lager_file_backend, [{file, "error.log"}, {level, error}]},
+                      {lager_file_backend, [{file, "console.log"}, {level, info}]}
+                     ]}
+         ]}
+].
